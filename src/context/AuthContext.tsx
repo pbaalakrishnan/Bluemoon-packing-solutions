@@ -19,13 +19,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const saved = localStorage.getItem(AUTH_USER_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.id && parsed.email) {
+          return parsed;
+        }
       }
     } catch (e) {
       console.error(e);
     }
-    // Default to admin user for first time setup
-    return dbService.getUsers()[0] || null;
+    // Return null so user is prompted to sign in with password when not authenticated
+    return null;
   });
 
   useEffect(() => {

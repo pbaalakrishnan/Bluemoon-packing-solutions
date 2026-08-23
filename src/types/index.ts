@@ -182,6 +182,26 @@ export interface FinishedGoodsSummary {
 
 export type SaleUnit = 'Cartons' | 'Pieces';
 
+export type PaymentStatus = 'Paid' | 'Partial' | 'Pending';
+
+export type PaymentMode =
+  | 'Bank Transfer / NEFT / RTGS'
+  | 'UPI'
+  | 'Cheque'
+  | 'Cash'
+  | 'Demand Draft';
+
+export interface PaymentReceipt {
+  id: string;
+  paymentDate: string;
+  amount: number;
+  paymentMode: PaymentMode | string;
+  referenceNo?: string;
+  notes?: string;
+  recordedBy: string;
+  recordedAt: string;
+}
+
 export interface SaleOrder {
   id: string;
   saleInvoiceNo: string; // Unique
@@ -197,6 +217,14 @@ export interface SaleOrder {
   piecesSold: number;
   piecesPerCarton: number;
   saleValue: number; // in INR
+  amountReceived?: number; // in INR
+  balanceDue?: number; // in INR
+  paymentStatus?: PaymentStatus; // 'Paid' | 'Partial' | 'Pending'
+  paymentMode?: PaymentMode | string;
+  paymentReference?: string;
+  paymentDate?: string;
+  paymentRemarks?: string;
+  payments?: PaymentReceipt[];
   status: 'Completed' | 'Cancelled';
   cancelledBy?: string;
   cancelledAt?: string;
@@ -323,6 +351,8 @@ export interface DashboardMetrics {
   weekSalesValue: number;
   monthSalesValue: number;
   totalSalesValue: number;
+  totalAmountReceived?: number;
+  totalOutstandingReceivables?: number;
   totalPiecesSold: number;
   totalCartonsSold: number;
 }

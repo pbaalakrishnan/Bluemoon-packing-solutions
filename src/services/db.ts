@@ -10,6 +10,9 @@ import {
   InventoryAdjustment,
   InventoryTransaction,
   PaperCorePurchase,
+  PaymentMode,
+  PaymentReceipt,
+  PaymentStatus,
   ProductionJob,
   ProductionOutput,
   ProductionRollUsage,
@@ -553,6 +556,25 @@ function getInitialSeedData(): DatabaseState {
       piecesSold: 720, // 5 x 144
       piecesPerCarton: 144,
       saleValue: 21600, // INR
+      amountReceived: 21600,
+      balanceDue: 0,
+      paymentStatus: 'Paid',
+      paymentMode: 'Bank Transfer / NEFT / RTGS',
+      paymentReference: 'NEFT-HDFC-998241',
+      paymentDate: '2026-08-20',
+      paymentRemarks: 'Full payment cleared on invoice presentation',
+      payments: [
+        {
+          id: 'pay-1',
+          paymentDate: '2026-08-20',
+          amount: 21600,
+          paymentMode: 'Bank Transfer / NEFT / RTGS',
+          referenceNo: 'NEFT-HDFC-998241',
+          notes: 'Full payment received against INV-2026-001',
+          recordedBy: 'sales@bluemoon.in',
+          recordedAt: '2026-08-20T12:00:00Z',
+        },
+      ],
       status: 'Completed',
       remarks: 'Direct dispatch for garment packing dispatch.',
       createdBy: 'sales@bluemoon.in',
@@ -1663,6 +1685,10 @@ class DatabaseService {
       saleUnit: 'Cartons' | 'Pieces';
       quantity: number; // Number of cartons or pieces entered
       saleValue: number;
+      amountReceived?: number;
+      paymentMode?: string;
+      paymentReference?: string;
+      paymentRemarks?: string;
       remarks?: string;
     },
     currentUser: string,
@@ -1730,6 +1756,26 @@ class DatabaseService {
       remainingToDeduct -= deductFromThis;
     }
 
+    // Calculate Payment & Receivables
+    const initialReceived = Math.max(0, Math.min(saleInput.saleValue, Number(saleInput.amountReceived || 0)));
+    const balanceDue = Math.max(0, saleInput.saleValue - initialReceived);
+    const paymentStatus: 'Paid' | 'Partial' | 'Pending' =
+      initialReceived >= saleInput.saleValue ? 'Paid' : initialReceived > 0 ? 'Partial' : 'Pending';
+
+    const payments: PaymentReceipt[] = [];
+    if (initialReceived > 0) {
+      payments.push({
+        id: `pay-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        paymentDate: saleInput.saleDate,
+        amount: initialReceived,
+        paymentMode: saleInput.paymentMode || 'Bank Transfer / NEFT / RTGS',
+        referenceNo: saleInput.paymentReference || '',
+        notes: saleInput.paymentRemarks || 'Initial payment on billing',
+        recordedBy: currentUser,
+        recordedAt: nowIso,
+      });
+    }
+
     // 3. Create Sale Order Record
     const newOrder: SaleOrder = {
       id: `sale-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -1746,6 +1792,14 @@ class DatabaseService {
       piecesSold,
       piecesPerCarton: pcsPerCarton,
       saleValue: saleInput.saleValue,
+      amountReceived: initialReceived,
+      balanceDue,
+      paymentStatus,
+      paymentMode: saleInput.paymentMode || (initialReceived > 0 ? 'Bank Transfer / NEFT / RTGS' : undefined),
+      paymentReference: saleInput.paymentReference,
+      paymentDate: initialReceived > 0 ? saleInput.saleDate : undefined,
+      paymentRemarks: saleInput.paymentRemarks,
+      payments,
       status: 'Completed',
       remarks: saleInput.remarks,
       createdBy: currentUser,
@@ -1766,7 +1820,7 @@ class DatabaseService {
       quantityAfter: availablePieces - piecesSold,
       unit: 'Pieces',
       user: currentUser,
-      remarks: `Sold ${cartonsSold} cartons (${piecesSold} pcs) to ${buyer.name} for ₹${saleInput.saleValue.toLocaleString()}`,
+      remarks: `Sold ${cartonsSold} cartons (${piecesSold} pcs) to ${buyer.name} for ₹${saleInput.saleValue.toLocaleString()} (Received: ₹${initialReceived.toLocaleString()})`,
     };
 
     this.state.salesOrders.unshift(newOrder);
@@ -1778,10 +1832,153 @@ class DatabaseService {
       'Sale Created',
       'Sales',
       newOrder.saleInvoiceNo,
-      `Sold ${piecesSold} pcs (${cartonsSold} cartons) of ${newOrder.tapeWidth} ${newOrder.tapeType} to ${buyer.name}`,
+      `Sold ${piecesSold} pcs (${cartonsSold} cartons) of ${newOrder.tapeWidth} ${newOrder.tapeType} to ${buyer.name}. Invoice: ₹${saleInput.saleValue} (Payment: ${paymentStatus})`,
     );
 
     return { success: true, order: newOrder };
+  }
+
+  // --- RECORD PAYMENT RECEIVED FOR SALE ---
+  public recordSalePayment(
+    saleInvoiceNoOrId: string,
+    payment: {
+      amount: number;
+      paymentDate: string;
+      paymentMode: string;
+      referenceNo?: string;
+      notes?: string;
+    },
+    currentUser: string,
+  ): { success: boolean; error?: string; order?: SaleOrder } {
+    const sale = this.state.salesOrders.find(
+      (s) =>
+        s.saleInvoiceNo.toUpperCase() === saleInvoiceNoOrId.toUpperCase() ||
+        s.id === saleInvoiceNoOrId,
+    );
+
+    if (!sale) {
+      return { success: false, error: `Sales Order "${saleInvoiceNoOrId}" not found.` };
+    }
+
+    if (sale.status === 'Cancelled') {
+      return { success: false, error: 'Cannot record payment for a cancelled sales order.' };
+    }
+
+    const payAmount = Number(payment.amount);
+    if (isNaN(payAmount) || payAmount <= 0) {
+      return { success: false, error: 'Payment amount must be greater than 0.' };
+    }
+
+    const currentReceived = sale.amountReceived || 0;
+    const currentDue = sale.saleValue - currentReceived;
+
+    if (payAmount > currentDue + 0.01) {
+      return {
+        success: false,
+        error: `Payment amount (₹${payAmount.toLocaleString()}) exceeds the remaining balance due (₹${currentDue.toLocaleString()}).`,
+      };
+    }
+
+    const nowIso = new Date().toISOString();
+    const newTotalReceived = currentReceived + payAmount;
+    const newBalanceDue = Math.max(0, sale.saleValue - newTotalReceived);
+    const newPaymentStatus: 'Paid' | 'Partial' = newBalanceDue <= 0.01 ? 'Paid' : 'Partial';
+
+    if (!sale.payments) {
+      sale.payments = [];
+    }
+
+    const newReceipt: PaymentReceipt = {
+      id: `pay-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      paymentDate: payment.paymentDate || nowIso.slice(0, 10),
+      amount: payAmount,
+      paymentMode: payment.paymentMode || 'Bank Transfer / NEFT / RTGS',
+      referenceNo: payment.referenceNo?.trim(),
+      notes: payment.notes?.trim(),
+      recordedBy: currentUser,
+      recordedAt: nowIso,
+    };
+
+    sale.payments.unshift(newReceipt);
+    sale.amountReceived = newTotalReceived;
+    sale.balanceDue = newBalanceDue;
+    sale.paymentStatus = newPaymentStatus;
+    sale.paymentMode = payment.paymentMode;
+    sale.paymentReference = payment.referenceNo;
+    sale.paymentDate = payment.paymentDate;
+
+    this.saveState(this.state);
+
+    this.logAudit(
+      currentUser,
+      'Payment Received',
+      'Sales',
+      sale.saleInvoiceNo,
+      `Received payment of ₹${payAmount.toLocaleString()} via ${payment.paymentMode} for Invoice ${sale.saleInvoiceNo}. Total Received: ₹${newTotalReceived.toLocaleString()} (${newPaymentStatus})`,
+    );
+
+    return { success: true, order: sale };
+  }
+
+  // --- DELETE / REVERSE PAYMENT RECEIPT ---
+  public deleteSalePayment(
+    saleInvoiceNoOrId: string,
+    paymentId: string,
+    currentUser: string,
+  ): { success: boolean; error?: string } {
+    const sale = this.state.salesOrders.find(
+      (s) =>
+        s.saleInvoiceNo.toUpperCase() === saleInvoiceNoOrId.toUpperCase() ||
+        s.id === saleInvoiceNoOrId,
+    );
+
+    if (!sale || !sale.payments) {
+      return { success: false, error: 'Sales Order or payments not found.' };
+    }
+
+    const pIdx = sale.payments.findIndex((p) => p.id === paymentId);
+    if (pIdx === -1) {
+      return { success: false, error: 'Payment record not found.' };
+    }
+
+    const removed = sale.payments[pIdx];
+    sale.payments.splice(pIdx, 1);
+
+    const recomputedReceived = sale.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    sale.amountReceived = recomputedReceived;
+    sale.balanceDue = Math.max(0, sale.saleValue - recomputedReceived);
+    sale.paymentStatus =
+      recomputedReceived >= sale.saleValue ? 'Paid' : recomputedReceived > 0 ? 'Partial' : 'Pending';
+
+    this.saveState(this.state);
+
+    this.logAudit(
+      currentUser,
+      'Payment Receipt Deleted',
+      'Sales',
+      sale.saleInvoiceNo,
+      `Deleted payment receipt of ₹${removed.amount.toLocaleString()} for Invoice ${sale.saleInvoiceNo}`,
+    );
+
+    return { success: true };
+  }
+
+  public getTotalSalesValue(): number {
+    return this.state.salesOrders
+      .filter((s) => s.status === 'Completed')
+      .reduce((sum, s) => sum + s.saleValue, 0);
+  }
+
+  public getTotalAmountReceived(): number {
+    return this.state.salesOrders
+      .filter((s) => s.status === 'Completed')
+      .reduce((sum, s) => sum + (s.amountReceived || 0), 0);
+  }
+
+  public getTotalOutstandingReceivables(): number {
+    return this.state.salesOrders
+      .filter((s) => s.status === 'Completed')
+      .reduce((sum, s) => sum + (s.balanceDue ?? (s.saleValue - (s.amountReceived || 0))), 0);
   }
 
   // --- SALES CANCELLATION / REVERSAL ---
@@ -2049,6 +2246,8 @@ class DatabaseService {
     const weekSalesValue = weekSales.reduce((sum, s) => sum + s.saleValue, 0);
     const monthSalesValue = monthSales.reduce((sum, s) => sum + s.saleValue, 0);
     const totalSalesValue = completedSales.reduce((sum, s) => sum + s.saleValue, 0);
+    const totalAmountReceived = completedSales.reduce((sum, s) => sum + (s.amountReceived || 0), 0);
+    const totalOutstandingReceivables = Math.max(0, totalSalesValue - totalAmountReceived);
     const totalPiecesSold = completedSales.reduce((sum, s) => sum + s.piecesSold, 0);
     const totalCartonsSold = completedSales.reduce((sum, s) => sum + s.cartonsSold, 0);
 
@@ -2073,6 +2272,8 @@ class DatabaseService {
       weekSalesValue,
       monthSalesValue,
       totalSalesValue,
+      totalAmountReceived,
+      totalOutstandingReceivables,
       totalPiecesSold,
       totalCartonsSold,
     };

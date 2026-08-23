@@ -228,12 +228,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 <div className="font-serif text-3xl font-bold text-white tracking-tight">
                   {formatCurrencyINR(metrics.totalSalesValue)}
                 </div>
-                <div className="text-xs text-white/70 mt-1">Cumulative Billing Value</div>
+                <div className="text-xs text-white/70 mt-1">Cumulative Invoiced Sales</div>
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-[11px] font-mono text-white/80">
-              <span>{formatNumber(metrics.totalPiecesSold)} Pcs Dispatched</span>
-              <span>({metrics.totalCartonsSold} Ctn)</span>
+              <span className="text-emerald-400">
+                Rec: {formatCurrencyINR(metrics.totalAmountReceived || 0)}
+              </span>
+              <span className="text-amber-300">
+                Due: {formatCurrencyINR(metrics.totalOutstandingReceivables || 0)}
+              </span>
             </div>
           </div>
         </div>

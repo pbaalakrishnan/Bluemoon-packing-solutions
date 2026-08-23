@@ -241,19 +241,62 @@ export const PrintModal: React.FC<PrintModalProps> = ({
                     </td>
                   </tr>
                 </tbody>
-                <tfoot className="bg-[#F8F8F5] border-t border-black font-bold">
+                <tfoot className="bg-[#F8F8F5] border-t border-black font-bold text-xs">
                   <tr>
-                    <td colSpan={4} className="p-2.5 text-right uppercase text-[11px] font-mono">
-                      Grand Total (INR):
+                    <td colSpan={4} className="p-2 text-right uppercase text-[11px] font-mono">
+                      Invoice Grand Total:
                     </td>
-                    <td className="p-2.5 text-right font-mono text-sm text-black">
+                    <td className="p-2 text-right font-mono text-sm text-black">
                       {formatCurrencyINR(data.saleValue)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan={4} className="p-2 text-right uppercase text-[11px] font-mono text-emerald-800">
+                      Amount Received:
+                    </td>
+                    <td className="p-2 text-right font-mono text-sm text-emerald-800">
+                      {formatCurrencyINR(data.amountReceived || 0)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan={4} className="p-2 text-right uppercase text-[11px] font-mono text-rose-800">
+                      Balance Due / Outstanding:
+                    </td>
+                    <td className="p-2 text-right font-mono text-sm text-rose-800">
+                      {formatCurrencyINR(Math.max(0, data.saleValue - (data.amountReceived || 0)))}
                     </td>
                   </tr>
                 </tfoot>
               </table>
 
-              <div className="pt-2 text-[11px] text-black/60">
+              {/* Payment Receipts Breakdown if available */}
+              {data.payments && data.payments.length > 0 && (
+                <div className="p-3 bg-[#F8F8F5] border border-black/15 text-[11px] space-y-1.5 font-mono">
+                  <div className="font-bold text-black uppercase text-[10px]">Payment Receipts Summary:</div>
+                  {data.payments.map((p: any, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center text-black/80">
+                      <span>
+                        • {formatDate(p.paymentDate)} via {p.paymentMode} {p.referenceNo ? `(Ref: ${p.referenceNo})` : ''}
+                      </span>
+                      <strong className="text-emerald-800">{formatCurrencyINR(p.amount)}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="pt-2 text-[11px] text-black/60 flex items-center justify-between">
+                <div>
+                  <strong>Payment Status:</strong>{' '}
+                  <span className="font-mono font-bold uppercase text-black">
+                    {data.paymentStatus || (data.amountReceived >= data.saleValue ? 'PAID IN FULL' : (data.amountReceived || 0) > 0 ? 'PARTIALLY PAID' : 'PAYMENT PENDING')}
+                  </span>
+                </div>
+                <div className="text-[10px] text-black/50">
+                  Authorized Signatory: ________________________
+                </div>
+              </div>
+
+              <div className="pt-1 text-[10px] text-black/60">
                 <strong>Declaration:</strong> We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
               </div>
             </div>
