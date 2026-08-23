@@ -162,6 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         login,
         logout,
+        switchUser,
         switchUserRole,
         hasPermission,
       }}
