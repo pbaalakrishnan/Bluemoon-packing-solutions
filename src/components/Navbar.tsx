@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../types';
 import { COMPANY_INFO, dbService } from '../services/db';
+import { CSVImportModal } from './CSVImportModal';
+import { ImportSectionKey } from '../utils/csvImportEngine';
 import {
   Menu,
   X,
@@ -12,23 +14,57 @@ import {
   ChevronDown,
   LogOut,
   User as UserIcon,
+  Upload,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface NavbarProps {
   onToggleSidebar: () => void;
   onOpenAlerts?: () => void;
   activeModule?: string;
+  onOpenCSVImport?: (section?: ImportSectionKey) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   onToggleSidebar,
   onOpenAlerts,
   activeModule,
+  onOpenCSVImport,
 }) => {
   const { currentUser, switchUserRole, logout } = useAuth();
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const alerts = dbService.getDashboardAlerts();
   const alertCount = alerts.filter((a) => a.type === 'danger' || a.type === 'warning').length;
+
+  // Map active module to matching import section key
+  const getSectionForActiveModule = (): ImportSectionKey => {
+    switch (activeModule) {
+      case 'masters':
+        return 'suppliers';
+      case 'purchases':
+      case 'raw-materials':
+        return 'rollTapePurchases';
+      case 'production':
+        return 'productionJobs';
+      case 'sales':
+        return 'salesOrders';
+      case 'adjustments':
+        return 'inventoryAdjustments';
+      case 'users':
+        return 'users';
+      default:
+        return 'suppliers';
+    }
+  };
+
+  const handleOpenCSVModal = () => {
+    if (onOpenCSVImport) {
+      onOpenCSVImport(getSectionForActiveModule());
+    } else {
+      setShowImportModal(true);
+    }
+  };
 
   const rolesList: Role[] = [
     'Admin',
@@ -73,6 +109,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right: Actions, Role Selector & User Profile */}
         <div className="flex items-center space-x-2 sm:space-x-3">
+          {/* Universal CSV Import Button */}
+          <button
+            onClick={handleOpenCSVModal}
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-black hover:bg-black/80 text-white text-xs font-mono uppercase tracking-wider font-semibold transition-colors shadow-xs"
+            title="Import or Update Records via .CSV File"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Import CSV</span>
+          </button>
+
           {/* Low Stock Alerts Icon */}
           {onOpenAlerts && (
             <button
