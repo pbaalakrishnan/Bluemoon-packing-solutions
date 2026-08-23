@@ -6,6 +6,7 @@ interface AuthContextType {
   currentUser: User | null;
   login: (emailOrUser: string, pass: string) => { success: boolean; error?: string };
   logout: () => void;
+  switchUser: (userIdOrRole: string) => void;
   switchUserRole: (role: Role) => void;
   hasPermission: (module: string) => boolean;
 }
@@ -32,10 +33,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem(AUTH_USER_KEY);
+    try {
+      if (currentUser) {
+        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(currentUser));
+      } else {
+        localStorage.removeItem(AUTH_USER_KEY);
+      }
+    } catch (e) {
+      console.error(e);
     }
   }, [currentUser]);
 
@@ -43,6 +48,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const res = dbService.authenticate(emailOrUser, pass);
     if (res.user) {
       setCurrentUser(res.user);
+      try {
+        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(res.user));
+      } catch (e) {
+        console.error(e);
+      }
       return { success: true };
     }
     return { success: false, error: res.error || 'Authentication failed' };
@@ -53,7 +63,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       dbService.logAudit(currentUser.email, 'User Logged Out', 'Authentication', currentUser.id);
     }
     setCurrentUser(null);
-    localStorage.removeItem(AUTH_USER_KEY);
+    try {
+      localStorage.removeItem(AUTH_USER_KEY);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const switchUser = (userIdOrRole: string) => {
+    const users = dbService.getUsers();
+    const targetUser =
+      users.find((u) => u.id === userIdOrRole || u.email.toLowerCase() === userIdOrRole.toLowerCase()) ||
+      users.find((u) => u.role === userIdOrRole);
+    if (targetUser) {
+      setCurrentUser(targetUser);
+      dbService.logAudit(
+        targetUser.email,
+        `Switched User to ${targetUser.name} (${targetUser.role})`,
+        'Authentication',
+        targetUser.id,
+      );
+    }
   };
 
   const switchUserRole = (role: Role) => {

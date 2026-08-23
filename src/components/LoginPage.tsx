@@ -25,36 +25,49 @@ export const LoginPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const performLogin = (user: string, pass: string) => {
     setErrorMessage(null);
+    const trimmedUser = user.trim();
+    const trimmedPass = pass.trim();
 
-    const trimmedUser = usernameOrEmail.trim();
     if (!trimmedUser) {
       setErrorMessage('Please enter your username or registered email address.');
       return;
     }
-    if (!password) {
+    if (!trimmedPass) {
       setErrorMessage('Please enter your security password.');
       return;
     }
 
     setIsSubmitting(true);
-
-    setTimeout(() => {
-      const res = login(trimmedUser, password);
+    try {
+      const res = login(trimmedUser, trimmedPass);
       setIsSubmitting(false);
 
       if (!res.success) {
         setErrorMessage(res.error || 'Invalid credentials. Please verify your username and password.');
       }
-    }, 300);
+    } catch (e: any) {
+      setIsSubmitting(false);
+      setErrorMessage(e?.message || 'Login encountered an unexpected error.');
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    performLogin(usernameOrEmail, password);
   };
 
   const handleQuickFill = (user: string, pass: string) => {
     setUsernameOrEmail(user);
     setPassword(pass);
     setErrorMessage(null);
+  };
+
+  const handleDirectSignIn = (user: string, pass: string) => {
+    setUsernameOrEmail(user);
+    setPassword(pass);
+    performLogin(user, pass);
   };
 
   const sampleAccounts = [
@@ -238,15 +251,16 @@ export const LoginPage: React.FC = () => {
 
               <div className="space-y-2.5">
                 {sampleAccounts.map((acc, idx) => (
-                  <button
+                  <div
                     key={idx}
-                    type="button"
-                    onClick={() => handleQuickFill(acc.username, acc.pass)}
-                    className="w-full text-left p-3 border border-black/15 hover:border-black hover:bg-[#F8F8F5] transition-all group flex items-center justify-between"
+                    className="p-3 border border-black/15 hover:border-black bg-white hover:bg-[#F8F8F5] transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5"
                   >
-                    <div className="space-y-0.5">
+                    <div
+                      onClick={() => handleQuickFill(acc.username, acc.pass)}
+                      className="space-y-0.5 cursor-pointer flex-1"
+                    >
                       <div className="flex items-center gap-2">
-                        <span className="font-serif font-bold text-xs text-black group-hover:text-black">
+                        <span className="font-serif font-bold text-xs text-black">
                           {acc.role}
                         </span>
                         <span className="px-1.5 py-0.2 border border-black/20 bg-[#F4F4F1] font-mono text-[9px] uppercase font-semibold">
@@ -260,11 +274,26 @@ export const LoginPage: React.FC = () => {
                         user: <strong className="text-black">{acc.username}</strong> • pass: <strong className="text-black">{acc.pass}</strong>
                       </div>
                     </div>
-                    <div className="text-[11px] font-mono font-semibold text-black/40 group-hover:text-black flex items-center gap-1 pl-2">
-                      <span>Use</span>
-                      <ArrowRight className="w-3 h-3" />
+                    <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => handleQuickFill(acc.username, acc.pass)}
+                        className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider border border-black/20 hover:border-black bg-white text-black transition-colors"
+                        title="Fill inputs"
+                      >
+                        Fill
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDirectSignIn(acc.username, acc.pass)}
+                        className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider bg-black hover:bg-black/80 text-white font-semibold flex items-center gap-1 transition-colors"
+                        title="Sign in instantly"
+                      >
+                        <span>Sign In</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
