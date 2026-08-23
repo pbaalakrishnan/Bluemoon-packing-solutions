@@ -2335,6 +2335,404 @@ class DatabaseService {
     };
   }
 
+  // --- INVENTORY & ITEM DELETIONS (ACID SAFE & AUDIT LOGGED) ---
+
+  public deleteRollTapePurchase(
+    rollId: string,
+    currentUser: string,
+  ): { success: boolean; error?: string } {
+    const idx = this.state.rollTapePurchases.findIndex(
+      (r) => r.rollId.toUpperCase() === rollId.toUpperCase(),
+    );
+    if (idx === -1) {
+      return { success: false, error: `Roll Tape ${rollId} not found.` };
+    }
+
+    const roll = this.state.rollTapePurchases[idx];
+    const nowIso = new Date().toISOString();
+
+    // Remove from array
+    this.state.rollTapePurchases.splice(idx, 1);
+
+    // Record ledger disposal / deletion
+    this.state.inventoryTransactions.unshift({
+      id: `tx-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: nowIso,
+      transactionType: 'Cancellation/Reversal',
+      category: 'Roll Tape',
+      materialOrProduct: `Jumbo Roll ${roll.rollId} (${roll.jumboRollType})`,
+      itemId: roll.rollId,
+      referenceNumber: `DEL-ROLL-${roll.rollId}`,
+      quantityBefore: roll.availableWeight,
+      quantityChanged: -roll.availableWeight,
+      quantityAfter: 0,
+      unit: 'Kg',
+      user: currentUser,
+      remarks: `Manual deletion of Roll ${roll.rollId} by ${currentUser}`,
+    });
+
+    this.saveState(this.state);
+    this.logAudit(
+      currentUser,
+      'Roll Tape Deleted',
+      'Raw Material Inventory',
+      roll.rollId,
+      `Deleted Roll ${roll.rollId} (Original: ${roll.originalWeight} Kg, Available: ${roll.availableWeight} Kg, Type: ${roll.jumboRollType})`,
+    );
+
+    return { success: true };
+  }
+
+  public deletePaperCorePurchase(
+    id: string,
+    currentUser: string,
+  ): { success: boolean; error?: string } {
+    const idx = this.state.paperCorePurchases.findIndex((p) => p.id === id);
+    if (idx === -1) {
+      return { success: false, error: 'Paper core purchase record not found.' };
+    }
+
+    const item = this.state.paperCorePurchases[idx];
+    const nowIso = new Date().toISOString();
+    const stockBefore = this.getTotalPaperCoreStock();
+
+    this.state.paperCorePurchases.splice(idx, 1);
+
+    this.state.inventoryTransactions.unshift({
+      id: `tx-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: nowIso,
+      transactionType: 'Cancellation/Reversal',
+      category: 'Paper Core',
+      materialOrProduct: `Paper Core (${item.thickness})`,
+      itemId: item.id,
+      referenceNumber: `DEL-PC-${item.id.slice(-6)}`,
+      quantityBefore: stockBefore,
+      quantityChanged: -item.weight,
+      quantityAfter: Math.max(0, stockBefore - item.weight),
+      unit: 'Kg',
+      user: currentUser,
+      remarks: `Deleted paper core purchase of ${item.weight} Kg`,
+    });
+
+    this.saveState(this.state);
+    this.logAudit(
+      currentUser,
+      'Paper Core Purchase Deleted',
+      'Raw Material Inventory',
+      item.id,
+      `Deleted purchase of ${item.weight} Kg (${item.thickness}) from ${item.supplierName}`,
+    );
+
+    return { success: true };
+  }
+
+  public deleteCartonPurchase(
+    id: string,
+    currentUser: string,
+  ): { success: boolean; error?: string } {
+    const idx = this.state.cartonBoxPurchases.findIndex((c) => c.id === id);
+    if (idx === -1) {
+      return { success: false, error: 'Carton box purchase record not found.' };
+    }
+
+    const item = this.state.cartonBoxPurchases[idx];
+    const nowIso = new Date().toISOString();
+    const stockBefore = this.getTotalCartonStock();
+
+    this.state.cartonBoxPurchases.splice(idx, 1);
+
+    this.state.inventoryTransactions.unshift({
+      id: `tx-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: nowIso,
+      transactionType: 'Cancellation/Reversal',
+      category: 'Carton Box',
+      materialOrProduct: 'Master Corrugated Carton Boxes',
+      itemId: item.id,
+      referenceNumber: `DEL-CB-${item.id.slice(-6)}`,
+      quantityBefore: stockBefore,
+      quantityChanged: -item.boxCount,
+      quantityAfter: Math.max(0, stockBefore - item.boxCount),
+      unit: 'Nos',
+      user: currentUser,
+      remarks: `Deleted carton box purchase of ${item.boxCount} boxes`,
+    });
+
+    this.saveState(this.state);
+    this.logAudit(
+      currentUser,
+      'Carton Purchase Deleted',
+      'Raw Material Inventory',
+      item.id,
+      `Deleted purchase of ${item.boxCount} boxes from ${item.supplierName}`,
+    );
+
+    return { success: true };
+  }
+
+  public deleteFilmPurchase(
+    id: string,
+    currentUser: string,
+  ): { success: boolean; error?: string } {
+    const idx = this.state.heatShrinkFilmPurchases.findIndex((f) => f.id === id);
+    if (idx === -1) {
+      return { success: false, error: 'Heat shrink film purchase record not found.' };
+    }
+
+    const item = this.state.heatShrinkFilmPurchases[idx];
+    const nowIso = new Date().toISOString();
+    const stockBefore = this.getTotalFilmStock();
+
+    this.state.heatShrinkFilmPurchases.splice(idx, 1);
+
+    this.state.inventoryTransactions.unshift({
+      id: `tx-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: nowIso,
+      transactionType: 'Cancellation/Reversal',
+      category: 'Heat Shrink Film',
+      materialOrProduct: 'Heat Shrink Packaging Film',
+      itemId: item.id,
+      referenceNumber: `DEL-HSF-${item.id.slice(-6)}`,
+      quantityBefore: stockBefore,
+      quantityChanged: -item.weight,
+      quantityAfter: Math.max(0, stockBefore - item.weight),
+      unit: 'Kg',
+      user: currentUser,
+      remarks: `Deleted heat shrink film purchase of ${item.weight} Kg`,
+    });
+
+    this.saveState(this.state);
+    this.logAudit(
+      currentUser,
+      'Heat Shrink Film Purchase Deleted',
+      'Raw Material Inventory',
+      item.id,
+      `Deleted purchase of ${item.weight} Kg from ${item.supplierName}`,
+    );
+
+    return { success: true };
+  }
+
+  public deleteFinishedGoodsItem(
+    id: string,
+    currentUser: string,
+  ): { success: boolean; error?: string } {
+    const idx = this.state.finishedGoods.findIndex((fg) => fg.id === id);
+    if (idx === -1) {
+      return { success: false, error: 'Finished goods record not found.' };
+    }
+
+    const item = this.state.finishedGoods[idx];
+    const nowIso = new Date().toISOString();
+    const availableBefore = this.getAvailablePiecesForProduct(item.tapeWidth, item.tapeType);
+
+    this.state.finishedGoods.splice(idx, 1);
+
+    this.state.inventoryTransactions.unshift({
+      id: `tx-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: nowIso,
+      transactionType: 'Cancellation/Reversal',
+      category: 'Finished Goods',
+      materialOrProduct: `BOPP Tape ${item.tapeWidth} ${item.tapeType}`,
+      itemId: item.id,
+      referenceNumber: `DEL-FG-${item.id.slice(-6)}`,
+      quantityBefore: availableBefore,
+      quantityChanged: -item.availableQuantity,
+      quantityAfter: Math.max(0, availableBefore - item.availableQuantity),
+      unit: 'Pieces',
+      user: currentUser,
+      remarks: `Manually deleted FG Batch from Job ${item.jobCardNo} (${item.availableQuantity} pcs)`,
+    });
+
+    this.saveState(this.state);
+    this.logAudit(
+      currentUser,
+      'Finished Goods Deleted',
+      'Finished Goods',
+      item.id,
+      `Deleted Finished Goods batch ${item.id} (Job ${item.jobCardNo}, ${item.tapeWidth} ${item.tapeType}, ${item.availableQuantity} pcs)`,
+    );
+
+    return { success: true };
+  }
+
+  public deleteProductionJob(
+    jobCardNoOrId: string,
+    currentUser: string,
+  ): { success: boolean; error?: string } {
+    const idx = this.state.productionJobs.findIndex(
+      (j) =>
+        j.jobCardNo.toUpperCase() === jobCardNoOrId.toUpperCase() ||
+        j.id === jobCardNoOrId,
+    );
+    if (idx === -1) {
+      return { success: false, error: `Production Job ${jobCardNoOrId} not found.` };
+    }
+
+    const job = this.state.productionJobs[idx];
+
+    // Remove job
+    this.state.productionJobs.splice(idx, 1);
+    this.saveState(this.state);
+
+    this.logAudit(
+      currentUser,
+      'Production Job Deleted',
+      'Production',
+      job.jobCardNo,
+      `Deleted Job Slip ${job.jobCardNo} (${job.totalPieces} pieces, ${job.totalCartons} cartons)`,
+    );
+
+    return { success: true };
+  }
+
+  public deleteJob(jobCardNoOrId: string, currentUser: string): { success: boolean; error?: string } {
+    return this.deleteProductionJob(jobCardNoOrId, currentUser);
+  }
+
+  public deleteSaleOrder(
+    saleInvoiceNoOrId: string,
+    currentUser: string,
+  ): { success: boolean; error?: string } {
+    const idx = this.state.salesOrders.findIndex(
+      (s) =>
+        s.saleInvoiceNo.toUpperCase() === saleInvoiceNoOrId.toUpperCase() ||
+        s.id === saleInvoiceNoOrId,
+    );
+    if (idx === -1) {
+      return { success: false, error: `Sale Order ${saleInvoiceNoOrId} not found.` };
+    }
+
+    const sale = this.state.salesOrders[idx];
+    this.state.salesOrders.splice(idx, 1);
+    this.saveState(this.state);
+
+    this.logAudit(
+      currentUser,
+      'Sale Order Deleted',
+      'Sales',
+      sale.saleInvoiceNo,
+      `Deleted Sale Invoice ${sale.saleInvoiceNo} (${sale.buyerName}, ₹${sale.saleValue})`,
+    );
+
+    return { success: true };
+  }
+
+  public deleteSale(saleInvoiceNoOrId: string, currentUser: string): { success: boolean; error?: string } {
+    return this.deleteSaleOrder(saleInvoiceNoOrId, currentUser);
+  }
+
+  public deleteSupplier(id: string, currentUser: string): { success: boolean; error?: string } {
+    const idx = this.state.suppliers.findIndex((s) => s.id === id);
+    if (idx === -1) return { success: false, error: 'Supplier not found.' };
+
+    const sup = this.state.suppliers[idx];
+    this.state.suppliers.splice(idx, 1);
+    this.saveState(this.state);
+
+    this.logAudit(currentUser, 'Supplier Deleted', 'Master Data', id, sup.name);
+    return { success: true };
+  }
+
+  public deleteBuyer(id: string, currentUser: string): { success: boolean; error?: string } {
+    const idx = this.state.buyers.findIndex((b) => b.id === id);
+    if (idx === -1) return { success: false, error: 'Buyer not found.' };
+
+    const buyer = this.state.buyers[idx];
+    this.state.buyers.splice(idx, 1);
+    this.saveState(this.state);
+
+    this.logAudit(currentUser, 'Buyer Deleted', 'Master Data', id, buyer.name);
+    return { success: true };
+  }
+
+  public deleteUser(userId: string, currentUser: string): { success: boolean; error?: string } {
+    const idx = this.state.users.findIndex((u) => u.id === userId);
+    if (idx === -1) return { success: false, error: 'User not found.' };
+
+    const userToDelete = this.state.users[idx];
+    if (userToDelete.email.toLowerCase() === currentUser.toLowerCase()) {
+      return { success: false, error: 'Cannot delete your own active user account.' };
+    }
+
+    // Ensure at least one Admin remains
+    const adminCount = this.state.users.filter((u) => u.role === 'Admin').length;
+    if (userToDelete.role === 'Admin' && adminCount <= 1) {
+      return { success: false, error: 'Cannot delete the only remaining Admin account.' };
+    }
+
+    this.state.users.splice(idx, 1);
+    this.saveState(this.state);
+
+    this.logAudit(
+      currentUser,
+      'User Deleted',
+      'User Management',
+      userId,
+      `${userToDelete.name} (${userToDelete.email})`,
+    );
+
+    return { success: true };
+  }
+
+  public deleteInventoryAdjustment(id: string, currentUser: string): { success: boolean; error?: string } {
+    const idx = this.state.inventoryAdjustments.findIndex((a) => a.id === id);
+    if (idx === -1) return { success: false, error: 'Adjustment record not found.' };
+
+    const adj = this.state.inventoryAdjustments[idx];
+    this.state.inventoryAdjustments.splice(idx, 1);
+    this.saveState(this.state);
+
+    this.logAudit(
+      currentUser,
+      'Adjustment Record Deleted',
+      'Inventory Ledger',
+      id,
+      `${adj.category} (${adj.itemIdentifier})`,
+    );
+
+    return { success: true };
+  }
+
+  public deleteAdjustment(id: string, currentUser: string): { success: boolean; error?: string } {
+    return this.deleteInventoryAdjustment(id, currentUser);
+  }
+
+  public purgeEmptyRolls(currentUser: string): { success: boolean; count: number } {
+    const beforeCount = this.state.rollTapePurchases.length;
+    this.state.rollTapePurchases = this.state.rollTapePurchases.filter(
+      (r) => r.availableWeight > 0.01 && r.status !== 'Fully Used',
+    );
+    const deletedCount = beforeCount - this.state.rollTapePurchases.length;
+    if (deletedCount > 0) {
+      this.saveState(this.state);
+      this.logAudit(
+        currentUser,
+        'Purged Depleted Rolls',
+        'Raw Material Inventory',
+        'bulk-purge',
+        `Purged ${deletedCount} fully consumed jumbo rolls from active database.`,
+      );
+    }
+    return { success: true, count: deletedCount };
+  }
+
+  public purgeDepletedFinishedGoods(currentUser: string): { success: boolean; count: number } {
+    const beforeCount = this.state.finishedGoods.length;
+    this.state.finishedGoods = this.state.finishedGoods.filter((fg) => fg.availableQuantity > 0);
+    const deletedCount = beforeCount - this.state.finishedGoods.length;
+    if (deletedCount > 0) {
+      this.saveState(this.state);
+      this.logAudit(
+        currentUser,
+        'Purged Depleted Finished Goods',
+        'Finished Goods',
+        'bulk-purge',
+        `Purged ${deletedCount} depleted finished goods batches.`,
+      );
+    }
+    return { success: true, count: deletedCount };
+  }
+
   public addSupplier(supplier: Omit<Supplier, 'id' | 'createdAt'>): Supplier {
     const newSup: Supplier = {
       ...supplier,

@@ -19,6 +19,8 @@ import {
   ShieldAlert,
   Calculator,
   Download,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface SalesModuleProps {
@@ -33,6 +35,7 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ onOpenPrintModal }) =>
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [saleToDelete, setSaleToDelete] = useState<{ id: string; invoiceNo: string; details: string } | null>(null);
 
   // Notifications
   const [formError, setFormError] = useState<string | null>(null);
@@ -43,6 +46,19 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ onOpenPrintModal }) =>
   const [buyerFilter, setBuyerFilter] = useState('');
   const [widthFilter, setWidthFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+
+  const handleDeleteSaleConfirm = () => {
+    if (!saleToDelete) return;
+    const userEmail = currentUser?.email || 'admin@bluemoon.in';
+    const res = dbService.deleteSale(saleToDelete.id, userEmail);
+    if (res.success) {
+      setFormSuccess(`Sales Invoice ${saleToDelete.invoiceNo} deleted from system.`);
+    } else {
+      alert(res.error || 'Failed to delete sale.');
+    }
+    setSaleToDelete(null);
+    setTimeout(() => setFormSuccess(null), 3500);
+  };
 
   // Form State
   const buyers = state.buyers.filter((b) => b.status === 'Active');
@@ -335,6 +351,19 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ onOpenPrintModal }) =>
                             <ShieldAlert className="w-3.5 h-3.5" />
                           </button>
                         )}
+                        <button
+                          onClick={() =>
+                            setSaleToDelete({
+                              id: sale.id,
+                              invoiceNo: sale.saleInvoiceNo,
+                              details: `${sale.buyerName} - ${sale.tapeWidth} (${sale.piecesSold} Pcs) - ₹${sale.saleValue}`,
+                            })
+                          }
+                          className="p-1.5 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-black/60 transition-colors"
+                          title="Permanently Delete Sales Record"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -631,6 +660,48 @@ export const SalesModule: React.FC<SalesModuleProps> = ({ onOpenPrintModal }) =>
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold disabled:opacity-50 uppercase tracking-wider"
               >
                 Confirm Reversal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PERMANENT SALE DELETION MODAL */}
+      {saleToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white border border-black/20 w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3 border-b border-black/15 pb-3">
+              <div className="w-9 h-9 bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-serif text-lg font-bold text-black">
+                  Delete Sales Invoice {saleToDelete.invoiceNo}
+                </h3>
+                <p className="text-xs text-black/60">This permanently removes the sales invoice from records.</p>
+              </div>
+            </div>
+
+            <div className="bg-[#F8F8F5] border border-black/10 p-3.5 space-y-1 text-xs">
+              <div className="font-bold text-black">Invoice: {saleToDelete.invoiceNo}</div>
+              <div className="text-black/70 font-mono text-[11px]">{saleToDelete.details}</div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setSaleToDelete(null)}
+                className="px-4 py-2 border border-black/20 bg-white hover:bg-[#F4F4F1] text-xs font-mono uppercase font-semibold text-black"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSaleConfirm}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-mono uppercase font-semibold flex items-center gap-1.5 shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Permanently Delete</span>
               </button>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { dbService } from '../services/db';
+import { useAuth } from '../context/AuthContext';
 import { formatCurrencyINR, formatDate, formatNumber, exportToCSV } from '../utils/exportUtils';
 import {
   Layers,
@@ -10,6 +11,10 @@ import {
   Film,
   Eye,
   X,
+  Trash2,
+  AlertTriangle,
+  CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
 
 interface RawMaterialInventoryProps {
@@ -17,18 +22,81 @@ interface RawMaterialInventoryProps {
 }
 
 export const RawMaterialInventory: React.FC<RawMaterialInventoryProps> = () => {
-  const state = dbService.getState();
+  const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'rollTape' | 'paperCore' | 'cartonBox' | 'heatShrinkFilm'>('rollTape');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
   const [selectedRollDetail, setSelectedRollDetail] = useState<any | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{
+    type: 'rollTape' | 'paperCore' | 'cartonBox' | 'heatShrinkFilm';
+    id: string;
+    label: string;
+    details: string;
+  } | null>(null);
+  const [notification, setNotification] = useState<string | null>(null);
+
+  const state = dbService.getState();
 
   // Overall Stock Stats
   const totalRollKg = state.rollTapePurchases.reduce((acc, r) => acc + r.availableWeight, 0);
   const totalPaperCoreKg = dbService.getTotalPaperCoreStock();
   const totalCartonBoxes = dbService.getTotalCartonStock();
   const totalShrinkFilmKg = dbService.getTotalFilmStock();
+
+  const showToast = (msg: string) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(null), 3500);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!itemToDelete) return;
+    const userEmail = currentUser?.email || 'admin@bluemoon.in';
+
+    if (itemToDelete.type === 'rollTape') {
+      const res = dbService.deleteRollTapePurchase(itemToDelete.id, userEmail);
+      if (res.success) {
+        showToast(`Roll Tape ${itemToDelete.id} was permanently removed from inventory.`);
+      } else {
+        alert(res.error || 'Failed to delete roll.');
+      }
+    } else if (itemToDelete.type === 'paperCore') {
+      const res = dbService.deletePaperCorePurchase(itemToDelete.id, userEmail);
+      if (res.success) {
+        showToast(`Paper Core batch (${itemToDelete.label}) removed.`);
+      } else {
+        alert(res.error || 'Failed to delete paper core entry.');
+      }
+    } else if (itemToDelete.type === 'cartonBox') {
+      const res = dbService.deleteCartonPurchase(itemToDelete.id, userEmail);
+      if (res.success) {
+        showToast(`Carton Box batch (${itemToDelete.label}) removed.`);
+      } else {
+        alert(res.error || 'Failed to delete carton box entry.');
+      }
+    } else if (itemToDelete.type === 'heatShrinkFilm') {
+      const res = dbService.deleteFilmPurchase(itemToDelete.id, userEmail);
+      if (res.success) {
+        showToast(`Heat Shrink Film batch (${itemToDelete.label}) removed.`);
+      } else {
+        alert(res.error || 'Failed to delete film entry.');
+      }
+    }
+
+    setItemToDelete(null);
+  };
+
+  const handlePurgeEmptyRolls = () => {
+    if (window.confirm('Are you sure you want to purge all fully consumed / 0 Kg roll tape records?')) {
+      const userEmail = currentUser?.email || 'admin@bluemoon.in';
+      const res = dbService.purgeEmptyRolls(userEmail);
+      if (res.count > 0) {
+        showToast(`Purged ${res.count} fully used roll(s) from inventory.`);
+      } else {
+        showToast('No depleted rolls were found to purge.');
+      }
+    }
+  };
 
   // Filtered lists
   const filteredRolls = state.rollTapePurchases.filter((r) => {
@@ -87,18 +155,38 @@ export const RawMaterialInventory: React.FC<RawMaterialInventoryProps> = () => {
             Raw Material Inventory.
           </h1>
           <p className="text-xs sm:text-sm text-black/60 mt-1">
-            Real-time balance, lot-by-lot tracking, and consumption history.
+            Real-time balance, lot-by-lot tracking, item deletions, and consumption history.
           </p>
         </div>
 
-        <button
-          onClick={exportRollInventory}
-          className="px-4 py-2 border border-black/20 bg-white hover:bg-black hover:text-white text-black text-xs font-sans uppercase tracking-[0.15em] font-semibold flex items-center gap-1.5 transition-colors self-start sm:self-auto"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>Export Stock Sheet</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {activeTab === 'rollTape' && (
+            <button
+              onClick={handlePurgeEmptyRolls}
+              className="px-3 py-2 border border-black/20 bg-white hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 text-black text-xs font-mono uppercase tracking-wider transition-colors flex items-center gap-1.5"
+              title="Purge all 0 Kg / Fully Used rolls from database"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>Purge Empty Rolls</span>
+            </button>
+          )}
+
+          <button
+            onClick={exportRollInventory}
+            className="px-4 py-2 border border-black/20 bg-white hover:bg-black hover:text-white text-black text-xs font-sans uppercase tracking-[0.15em] font-semibold flex items-center gap-1.5 transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export Stock Sheet</span>
+          </button>
+        </div>
       </div>
+
+      {notification && (
+        <div className="p-3.5 border border-black/15 bg-white text-black text-xs font-medium flex items-center gap-2 shadow-xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{notification}</span>
+        </div>
+      )}
 
       {/* Stock Cards Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -302,13 +390,29 @@ export const RawMaterialInventory: React.FC<RawMaterialInventoryProps> = () => {
                         </span>
                       </td>
                       <td className="p-3 text-center">
-                        <button
-                          onClick={() => setSelectedRollDetail(roll)}
-                          className="p-1.5 border border-black/15 bg-white hover:bg-black hover:text-white transition-colors"
-                          title="View Roll Lot Details"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-center space-x-1">
+                          <button
+                            onClick={() => setSelectedRollDetail(roll)}
+                            className="p-1.5 border border-black/15 bg-white hover:bg-black hover:text-white transition-colors"
+                            title="View Roll Lot Details"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setItemToDelete({
+                                type: 'rollTape',
+                                id: roll.rollId,
+                                label: `Roll ${roll.rollId}`,
+                                details: `${roll.jumboRollType} (${roll.rollWidth}, ${roll.thickness}) - Available: ${roll.availableWeight} Kg`,
+                              })
+                            }
+                            className="p-1.5 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-black/60 transition-colors"
+                            title="Delete Roll Tape"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -338,6 +442,7 @@ export const RawMaterialInventory: React.FC<RawMaterialInventoryProps> = () => {
                   <th className="p-3">Thickness</th>
                   <th className="p-3 text-right">Inward Weight (Kg)</th>
                   <th className="p-3 text-right">Total Cost (₹)</th>
+                  <th className="p-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/10">
@@ -351,6 +456,22 @@ export const RawMaterialInventory: React.FC<RawMaterialInventoryProps> = () => {
                       {formatNumber(core.weight)} Kg
                     </td>
                     <td className="p-3 text-right font-mono">{formatCurrencyINR(core.cost)}</td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() =>
+                          setItemToDelete({
+                            type: 'paperCore',
+                            id: core.id,
+                            label: `Paper Core (${core.thickness})`,
+                            details: `Inward ${core.weight} Kg from ${core.supplierName}`,
+                          })
+                        }
+                        className="p-1.5 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-black/60 transition-colors"
+                        title="Delete Paper Core Entry"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -376,6 +497,7 @@ export const RawMaterialInventory: React.FC<RawMaterialInventoryProps> = () => {
                   <th className="p-3">Supplier</th>
                   <th className="p-3 text-right">Boxes Purchased</th>
                   <th className="p-3 text-right">Total Cost (₹)</th>
+                  <th className="p-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/10">
@@ -387,6 +509,22 @@ export const RawMaterialInventory: React.FC<RawMaterialInventoryProps> = () => {
                       {formatNumber(cb.boxCount)} Nos
                     </td>
                     <td className="p-3 text-right font-mono">{formatCurrencyINR(cb.cost)}</td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() =>
+                          setItemToDelete({
+                            type: 'cartonBox',
+                            id: cb.id,
+                            label: `Carton Boxes (${cb.boxCount} Nos)`,
+                            details: `Supplier: ${cb.supplierName}, Cost: ₹${cb.cost}`,
+                          })
+                        }
+                        className="p-1.5 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-black/60 transition-colors"
+                        title="Delete Carton Box Entry"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -412,6 +550,7 @@ export const RawMaterialInventory: React.FC<RawMaterialInventoryProps> = () => {
                   <th className="p-3">Supplier</th>
                   <th className="p-3 text-right">Purchased Weight (Kg)</th>
                   <th className="p-3 text-right">Total Cost (₹)</th>
+                  <th className="p-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/10">
@@ -423,10 +562,68 @@ export const RawMaterialInventory: React.FC<RawMaterialInventoryProps> = () => {
                       {formatNumber(f.weight)} Kg
                     </td>
                     <td className="p-3 text-right font-mono">{formatCurrencyINR(f.cost)}</td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() =>
+                          setItemToDelete({
+                            type: 'heatShrinkFilm',
+                            id: f.id,
+                            label: `Heat Shrink Film (${f.weight} Kg)`,
+                            details: `Supplier: ${f.supplierName}, Cost: ₹${f.cost}`,
+                          })
+                        }
+                        className="p-1.5 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-black/60 transition-colors"
+                        title="Delete Heat Shrink Film Entry"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {itemToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white border border-black/20 w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3 border-b border-black/15 pb-3">
+              <div className="w-9 h-9 bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-serif text-lg font-bold text-black">
+                  Confirm Inventory Deletion
+                </h3>
+                <p className="text-xs text-black/60">This action will be logged in the immutable audit ledger.</p>
+              </div>
+            </div>
+
+            <div className="bg-[#F8F8F5] border border-black/10 p-3.5 space-y-1 text-xs">
+              <div className="font-bold text-black">{itemToDelete.label}</div>
+              <div className="text-black/70 font-mono text-[11px]">{itemToDelete.details}</div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setItemToDelete(null)}
+                className="px-4 py-2 border border-black/20 bg-white hover:bg-[#F4F4F1] text-xs font-mono uppercase font-semibold text-black"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteConfirm}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-mono uppercase font-semibold flex items-center gap-1.5 shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Permanently Delete</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

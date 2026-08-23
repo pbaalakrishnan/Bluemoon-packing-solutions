@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { dbService } from '../services/db';
+import { useAuth } from '../context/AuthContext';
 import { formatDate, formatNumber, exportToCSV } from '../utils/exportUtils';
 import {
   PackageCheck,
   Search,
   Download,
   Printer,
+  Trash2,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface FinishedGoodsModuleProps {
@@ -13,6 +17,7 @@ interface FinishedGoodsModuleProps {
 }
 
 export const FinishedGoodsModule: React.FC<FinishedGoodsModuleProps> = ({ onOpenPrintModal }) => {
+  const { currentUser } = useAuth();
   const state = dbService.getState();
   const summary = dbService.getFinishedGoodsSummary();
 
@@ -20,6 +25,37 @@ export const FinishedGoodsModule: React.FC<FinishedGoodsModuleProps> = ({ onOpen
   const [widthFilter, setWidthFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [viewMode, setViewMode] = useState<'matrix' | 'batches'>('matrix');
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; label: string; details: string } | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleDeleteBatch = () => {
+    if (!itemToDelete) return;
+    const userEmail = currentUser?.email || 'admin@bluemoon.in';
+    const res = dbService.deleteFinishedGoodsItem(itemToDelete.id, userEmail);
+    if (res.success) {
+      showToast(`Finished Goods batch (${itemToDelete.label}) deleted from inventory.`);
+    } else {
+      alert(res.error || 'Failed to delete finished goods item.');
+    }
+    setItemToDelete(null);
+  };
+
+  const handlePurgeDepleted = () => {
+    if (window.confirm('Purge all completed/depleted (0 Pcs) finished goods batches?')) {
+      const userEmail = currentUser?.email || 'admin@bluemoon.in';
+      const res = dbService.purgeDepletedFinishedGoods(userEmail);
+      if (res.count > 0) {
+        showToast(`Purged ${res.count} depleted batch(es).`);
+      } else {
+        showToast('No 0 Pcs batches found to purge.');
+      }
+    }
+  };
 
   // Summary Totals
   const totalAvailablePieces = summary.reduce((sum, s) => sum + s.totalPieces, 0);
@@ -75,7 +111,15 @@ export const FinishedGoodsModule: React.FC<FinishedGoodsModuleProps> = ({ onOpen
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handlePurgeDepleted}
+            className="px-3 py-2 border border-black/20 bg-white hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 text-black text-xs font-mono uppercase tracking-wider transition-colors flex items-center gap-1.5"
+            title="Purge all 0-Stock finished goods records"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+            <span>Purge 0-Stock</span>
+          </button>
           <button
             onClick={() => onOpenPrintModal('Finished Goods Stock Report', summary, 'report')}
             className="px-3.5 py-2 border border-black/20 bg-white hover:bg-black hover:text-white text-black text-xs font-sans uppercase tracking-[0.15em] font-semibold flex items-center gap-1.5 transition-colors"
@@ -92,6 +136,13 @@ export const FinishedGoodsModule: React.FC<FinishedGoodsModuleProps> = ({ onOpen
           </button>
         </div>
       </div>
+
+      {toastMessage && (
+        <div className="p-3.5 border border-black/15 bg-white text-black text-xs font-medium flex items-center gap-2 shadow-xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -244,6 +295,7 @@ export const FinishedGoodsModule: React.FC<FinishedGoodsModuleProps> = ({ onOpen
                   <th className="p-3 text-right">Available Pieces</th>
                   <th className="p-3 text-right">Cartons</th>
                   <th className="p-3 text-right">Operator</th>
+                  <th className="p-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/10">
@@ -262,10 +314,67 @@ export const FinishedGoodsModule: React.FC<FinishedGoodsModuleProps> = ({ onOpen
                       {fg.availableCartons} Ctn
                     </td>
                     <td className="p-3 text-right text-black/50 text-[10px] font-mono">{fg.createdBy}</td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() =>
+                          setItemToDelete({
+                            id: fg.id,
+                            label: `Job ${fg.jobCardNo} Batch`,
+                            details: `${fg.tapeWidth} ${fg.tapeType} - ${fg.availableQuantity} available pcs`,
+                          })
+                        }
+                        className="p-1.5 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-black/60 transition-colors"
+                        title="Delete Finished Goods Batch"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE BATCH CONFIRMATION MODAL */}
+      {itemToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white border border-black/20 w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3 border-b border-black/15 pb-3">
+              <div className="w-9 h-9 bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-serif text-lg font-bold text-black">
+                  Delete Finished Goods Batch
+                </h3>
+                <p className="text-xs text-black/60">This will decrement ready-to-sell stock and record in ledger.</p>
+              </div>
+            </div>
+
+            <div className="bg-[#F8F8F5] border border-black/10 p-3.5 space-y-1 text-xs">
+              <div className="font-bold text-black">{itemToDelete.label}</div>
+              <div className="text-black/70 font-mono text-[11px]">{itemToDelete.details}</div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setItemToDelete(null)}
+                className="px-4 py-2 border border-black/20 bg-white hover:bg-[#F4F4F1] text-xs font-mono uppercase font-semibold text-black"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteBatch}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-mono uppercase font-semibold flex items-center gap-1.5 shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Batch</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

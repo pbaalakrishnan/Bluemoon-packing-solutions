@@ -9,8 +9,9 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertTriangle,
-  PlayCircle,
   ChevronDown,
+  LogOut,
+  User as UserIcon,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -24,7 +25,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAlerts,
   activeModule,
 }) => {
-  const { currentUser, switchUserRole } = useAuth();
+  const { currentUser, switchUserRole, logout } = useAuth();
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const alerts = dbService.getDashboardAlerts();
   const alertCount = alerts.filter((a) => a.type === 'danger' || a.type === 'warning').length;
@@ -131,7 +132,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* User Avatar */}
+          {/* User Avatar & Logout */}
           <div className="flex items-center space-x-2.5 pl-2 sm:pl-3 border-l border-black/10">
             <div className="w-7 h-7 bg-black text-white flex items-center justify-center text-xs font-mono font-bold">
               {currentUser?.name.charAt(0) || 'U'}
@@ -144,6 +145,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {currentUser?.email || 'admin@bluemoon.in'}
               </div>
             </div>
+
+            <button
+              onClick={() => {
+                if (window.confirm('Are you sure you want to log out of Bluemoon ERP?')) {
+                  logout();
+                }
+              }}
+              className="p-1.5 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 text-black/60 transition-colors ml-1"
+              title="Sign Out of Session"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </div>

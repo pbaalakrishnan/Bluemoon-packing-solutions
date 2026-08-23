@@ -24,7 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.error(e);
     }
-    // Default to Admin if first load for ease of use
+    // Default to admin user for first time setup
     return dbService.getUsers()[0] || null;
   });
 
@@ -50,6 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       dbService.logAudit(currentUser.email, 'User Logged Out', 'Authentication', currentUser.id);
     }
     setCurrentUser(null);
+    localStorage.removeItem(AUTH_USER_KEY);
   };
 
   const switchUserRole = (role: Role) => {
@@ -69,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!currentUser) return false;
     const role = currentUser.role;
 
-    if (role === 'Admin') return true;
+    if (role === 'Admin' || role === 'Super Admin') return true;
 
     if (role === 'Viewer') {
       // Read-only access to Dashboard, Raw Materials, Production, Finished Goods, Sales, Reports, Ledger
@@ -84,36 +85,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ].includes(module);
     }
 
-    if (role === 'Inventory User') {
+    if (role === 'Inventory User' || role === 'Inventory Manager') {
       return [
         'dashboard',
         'purchases',
         'raw-materials',
         'finished-goods',
         'ledger',
+        'adjustments',
         'reports',
-        'master-data',
+        'masters',
       ].includes(module);
     }
 
-    if (role === 'Production User') {
+    if (role === 'Production User' || role === 'Production Manager') {
       return [
         'dashboard',
         'raw-materials',
         'production',
         'finished-goods',
         'ledger',
+        'adjustments',
         'reports',
       ].includes(module);
     }
 
-    if (role === 'Sales User') {
+    if (role === 'Sales User' || role === 'Sales Manager') {
       return [
         'dashboard',
         'finished-goods',
         'sales',
         'reports',
-        'master-data',
+        'masters',
       ].includes(module);
     }
 

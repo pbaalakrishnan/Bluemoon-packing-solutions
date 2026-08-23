@@ -40,6 +40,7 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({ onOpenPrintM
   const [selectedJob, setSelectedJob] = useState<ProductionJob | null>(null);
   const [showCancelModal, setShowCancelModal] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [jobToDelete, setJobToDelete] = useState<{ id: string; jobCardNo: string; details: string } | null>(null);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,6 +49,19 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({ onOpenPrintM
   // Form notifications
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
+
+  const handleDeleteJobConfirm = () => {
+    if (!jobToDelete) return;
+    const userEmail = currentUser?.email || 'admin@bluemoon.in';
+    const res = dbService.deleteJob(jobToDelete.id, userEmail);
+    if (res.success) {
+      setFormSuccess(`Job Card ${jobToDelete.jobCardNo} permanently deleted from records.`);
+    } else {
+      alert(res.error || 'Failed to delete job.');
+    }
+    setJobToDelete(null);
+    setTimeout(() => setFormSuccess(null), 3500);
+  };
 
   // Available stock balances
   const availableRolls = dbService.getAvailableRolls();
@@ -449,6 +463,19 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({ onOpenPrintM
                           title="Print Production Job Sheet"
                         >
                           <Printer className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() =>
+                            setJobToDelete({
+                              id: job.id,
+                              jobCardNo: job.jobCardNo,
+                              details: `Produced: ${job.totalPieces} Pcs (${job.totalCartons} Boxes) on ${job.productionDate}`,
+                            })
+                          }
+                          className="p-1.5 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-black/60 transition-colors"
+                          title="Permanently Delete Job Card"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
@@ -1001,6 +1028,48 @@ export const ProductionModule: React.FC<ProductionModuleProps> = ({ onOpenPrintM
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold disabled:opacity-50 uppercase tracking-wider"
               >
                 Confirm Reversal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PERMANENT JOB DELETION MODAL */}
+      {jobToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white border border-black/20 w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3 border-b border-black/15 pb-3">
+              <div className="w-9 h-9 bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-serif text-lg font-bold text-black">
+                  Delete Job Card {jobToDelete.jobCardNo}
+                </h3>
+                <p className="text-xs text-black/60">This permanently removes the production run from ledger records.</p>
+              </div>
+            </div>
+
+            <div className="bg-[#F8F8F5] border border-black/10 p-3.5 space-y-1 text-xs">
+              <div className="font-bold text-black">Job Card: {jobToDelete.jobCardNo}</div>
+              <div className="text-black/70 font-mono text-[11px]">{jobToDelete.details}</div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setJobToDelete(null)}
+                className="px-4 py-2 border border-black/20 bg-white hover:bg-[#F4F4F1] text-xs font-mono uppercase font-semibold text-black"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteJobConfirm}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-mono uppercase font-semibold flex items-center gap-1.5 shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Permanently Delete</span>
               </button>
             </div>
           </div>

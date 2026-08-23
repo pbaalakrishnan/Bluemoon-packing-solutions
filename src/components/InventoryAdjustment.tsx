@@ -7,6 +7,8 @@ import {
   CheckCircle2,
   AlertCircle,
   ShieldAlert,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 
 export const InventoryAdjustment: React.FC = () => {
@@ -23,6 +25,20 @@ export const InventoryAdjustment: React.FC = () => {
 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [adjToDelete, setAdjToDelete] = useState<{ id: string; details: string } | null>(null);
+
+  const handleDeleteAdjustment = () => {
+    if (!adjToDelete) return;
+    const userEmail = currentUser?.email || 'admin@bluemoon.in';
+    const res = dbService.deleteAdjustment(adjToDelete.id, userEmail);
+    if (res.success) {
+      setSuccess('Adjustment record deleted.');
+    } else {
+      setError(res.error || 'Failed to delete adjustment.');
+    }
+    setAdjToDelete(null);
+    setTimeout(() => setSuccess(null), 3000);
+  };
 
   // Compute current system quantity based on selected category & item
   let systemQty = 0;
@@ -288,7 +304,21 @@ export const InventoryAdjustment: React.FC = () => {
                 <div key={adj.id} className="p-3 bg-[#F8F8F5] border border-black/10 text-xs space-y-1">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-black">{adj.category}</span>
-                    <span className="text-[10px] text-black/50 font-mono">{formatDateTime(adj.timestamp)}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-black/50 font-mono">{formatDateTime(adj.timestamp)}</span>
+                      <button
+                        onClick={() =>
+                          setAdjToDelete({
+                            id: adj.id,
+                            details: `${adj.category} - ${adj.itemIdentifier} (${adj.systemQuantity} → ${adj.physicalQuantity} ${adj.unit})`,
+                          })
+                        }
+                        className="p-1 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-black/40 transition-colors"
+                        title="Delete Adjustment Record"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                   <div className="text-black/60 font-mono text-[11px]">
                     Item: <span className="text-black">{adj.itemIdentifier}</span>
@@ -308,6 +338,47 @@ export const InventoryAdjustment: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* DELETE ADJUSTMENT CONFIRMATION MODAL */}
+      {adjToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white border border-black/20 w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3 border-b border-black/15 pb-3">
+              <div className="w-9 h-9 bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-serif text-lg font-bold text-black">
+                  Delete Adjustment Record
+                </h3>
+                <p className="text-xs text-black/60">This permanently removes the adjustment audit record.</p>
+              </div>
+            </div>
+
+            <div className="bg-[#F8F8F5] border border-black/10 p-3.5 space-y-1 text-xs">
+              <div className="text-black/70 font-mono text-[11px]">{adjToDelete.details}</div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setAdjToDelete(null)}
+                className="px-4 py-2 border border-black/20 bg-white hover:bg-[#F4F4F1] text-xs font-mono uppercase font-semibold text-black"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAdjustment}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-mono uppercase font-semibold flex items-center gap-1.5 shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Permanently Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

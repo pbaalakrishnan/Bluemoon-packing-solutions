@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { dbService } from '../services/db';
+import { useAuth } from '../context/AuthContext';
 import {
   Users,
   Building2,
@@ -10,9 +11,12 @@ import {
   Mail,
   MapPin,
   FileText,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 
 export const MastersModule: React.FC = () => {
+  const { currentUser } = useAuth();
   const state = dbService.getState();
   const [activeTab, setActiveTab] = useState<'suppliers' | 'buyers'>('suppliers');
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,6 +40,35 @@ export const MastersModule: React.FC = () => {
   const [buyGst, setBuyGst] = useState('');
 
   const [notification, setNotification] = useState<string | null>(null);
+  const [entityToDelete, setEntityToDelete] = useState<{
+    type: 'supplier' | 'buyer';
+    id: string;
+    name: string;
+  } | null>(null);
+
+  const handleDeleteEntity = () => {
+    if (!entityToDelete) return;
+    const userEmail = currentUser?.email || 'admin@bluemoon.in';
+
+    if (entityToDelete.type === 'supplier') {
+      const res = dbService.deleteSupplier(entityToDelete.id, userEmail);
+      if (res.success) {
+        setNotification(`Supplier "${entityToDelete.name}" deleted successfully.`);
+      } else {
+        alert(res.error || 'Failed to delete supplier.');
+      }
+    } else {
+      const res = dbService.deleteBuyer(entityToDelete.id, userEmail);
+      if (res.success) {
+        setNotification(`Buyer / Customer "${entityToDelete.name}" deleted successfully.`);
+      } else {
+        alert(res.error || 'Failed to delete buyer.');
+      }
+    }
+
+    setEntityToDelete(null);
+    setTimeout(() => setNotification(null), 3000);
+  };
 
   const handleCreateSupplier = (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,9 +232,24 @@ export const MastersModule: React.FC = () => {
                   <h3 className="font-serif text-base font-bold text-black">{sup.name}</h3>
                   <p className="text-[11px] text-black/60 font-medium">{sup.contactPerson}</p>
                 </div>
-                <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase border border-black/20 bg-[#F4F4F1]">
-                  {sup.status}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase border border-black/20 bg-[#F4F4F1]">
+                    {sup.status}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setEntityToDelete({
+                        type: 'supplier',
+                        id: sup.id,
+                        name: sup.name,
+                      })
+                    }
+                    className="p-1 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-black/40 transition-colors"
+                    title="Delete Supplier"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-1.5 text-xs text-black/70 pt-2 border-t border-black/10">
@@ -242,9 +290,24 @@ export const MastersModule: React.FC = () => {
                   <h3 className="font-serif text-base font-bold text-black">{buy.name}</h3>
                   <p className="text-[11px] text-black/60 font-medium">{buy.contactPerson}</p>
                 </div>
-                <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase border border-black/20 bg-[#F4F4F1]">
-                  {buy.status}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase border border-black/20 bg-[#F4F4F1]">
+                    {buy.status}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setEntityToDelete({
+                        type: 'buyer',
+                        id: buy.id,
+                        name: buy.name,
+                      })
+                    }
+                    className="p-1 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-black/40 transition-colors"
+                    title="Delete Buyer"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-1.5 text-xs text-black/70 pt-2 border-t border-black/10">
@@ -440,6 +503,48 @@ export const MastersModule: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE MASTER RECORD CONFIRMATION MODAL */}
+      {entityToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white border border-black/20 w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3 border-b border-black/15 pb-3">
+              <div className="w-9 h-9 bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-serif text-lg font-bold text-black">
+                  Delete {entityToDelete.type === 'supplier' ? 'Supplier' : 'Customer / Buyer'}
+                </h3>
+                <p className="text-xs text-black/60">This permanently removes the master record from the system.</p>
+              </div>
+            </div>
+
+            <div className="bg-[#F8F8F5] border border-black/10 p-3.5 space-y-1 text-xs">
+              <div className="font-bold text-black">{entityToDelete.name}</div>
+              <div className="text-black/60 text-[11px]">ID: {entityToDelete.id}</div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setEntityToDelete(null)}
+                className="px-4 py-2 border border-black/20 bg-white hover:bg-[#F4F4F1] text-xs font-mono uppercase font-semibold text-black"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteEntity}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-mono uppercase font-semibold flex items-center gap-1.5 shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Permanently Delete</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

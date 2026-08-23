@@ -15,11 +15,17 @@ import { MastersModule } from './components/MastersModule';
 import { UserManagementModule } from './components/UserManagementModule';
 import { SettingsModule } from './components/SettingsModule';
 import { PrintModal } from './components/PrintModal';
+import { LoginPage } from './components/LoginPage';
 
 const MainLayout: React.FC = () => {
   const { currentUser, hasPermission } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // If user is not authenticated, render the login page
+  if (!currentUser) {
+    return <LoginPage />;
+  }
 
   // Print modal state
   const [printModalState, setPrintModalState] = useState<{

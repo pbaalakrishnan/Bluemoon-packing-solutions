@@ -26,6 +26,8 @@ import {
   Layers,
   Boxes,
   Film,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface PurchaseModuleProps {
@@ -48,10 +50,54 @@ export const PurchaseModule: React.FC<PurchaseModuleProps> = ({ onOpenPrintModal
   const [showCoreModal, setShowCoreModal] = useState(false);
   const [showCartonModal, setShowCartonModal] = useState(false);
   const [showFilmModal, setShowFilmModal] = useState(false);
+  const [purchaseToDelete, setPurchaseToDelete] = useState<{
+    type: 'rollTape' | 'paperCore' | 'cartonBox' | 'heatShrinkFilm';
+    id: string;
+    label: string;
+    details: string;
+  } | null>(null);
 
   // Form error & success banners
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
+
+  const handleDeletePurchase = () => {
+    if (!purchaseToDelete) return;
+    const userEmail = currentUser?.email || 'admin@bluemoon.in';
+
+    if (purchaseToDelete.type === 'rollTape') {
+      const res = dbService.deleteRollTapePurchase(purchaseToDelete.id, userEmail);
+      if (res.success) {
+        setFormSuccess(`Roll Tape ${purchaseToDelete.id} purchase record deleted.`);
+      } else {
+        alert(res.error || 'Failed to delete roll purchase.');
+      }
+    } else if (purchaseToDelete.type === 'paperCore') {
+      const res = dbService.deletePaperCorePurchase(purchaseToDelete.id, userEmail);
+      if (res.success) {
+        setFormSuccess(`Paper core purchase record deleted.`);
+      } else {
+        alert(res.error || 'Failed to delete paper core.');
+      }
+    } else if (purchaseToDelete.type === 'cartonBox') {
+      const res = dbService.deleteCartonPurchase(purchaseToDelete.id, userEmail);
+      if (res.success) {
+        setFormSuccess(`Carton box purchase record deleted.`);
+      } else {
+        alert(res.error || 'Failed to delete carton box.');
+      }
+    } else if (purchaseToDelete.type === 'heatShrinkFilm') {
+      const res = dbService.deleteFilmPurchase(purchaseToDelete.id, userEmail);
+      if (res.success) {
+        setFormSuccess(`Heat shrink film purchase record deleted.`);
+      } else {
+        alert(res.error || 'Failed to delete film purchase.');
+      }
+    }
+
+    setPurchaseToDelete(null);
+    setTimeout(() => setFormSuccess(null), 3500);
+  };
 
   // Roll Tape Form State
   const [rollForm, setRollForm] = useState({
@@ -617,13 +663,29 @@ export const PurchaseModule: React.FC<PurchaseModuleProps> = ({ onOpenPrintModal
                         </span>
                       </td>
                       <td className="p-3 text-center">
-                        <button
-                          onClick={() => onOpenPrintModal(`Goods Receipt Note - ${roll.rollId}`, roll, 'purchase')}
-                          className="p-1.5 border border-black/15 bg-white hover:bg-black hover:text-white transition-colors"
-                          title="Print Inward GRN"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-center space-x-1">
+                          <button
+                            onClick={() => onOpenPrintModal(`Goods Receipt Note - ${roll.rollId}`, roll, 'purchase')}
+                            className="p-1.5 border border-black/15 bg-white hover:bg-black hover:text-white transition-colors"
+                            title="Print Inward GRN"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setPurchaseToDelete({
+                                type: 'rollTape',
+                                id: roll.rollId,
+                                label: `Roll Tape ${roll.rollId}`,
+                                details: `${roll.jumboRollType} (${roll.rollWidth}, ${roll.thickness}) - Inward: ${roll.originalWeight} Kg`,
+                              })
+                            }
+                            className="p-1.5 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-black/60 transition-colors"
+                            title="Delete Roll Tape Purchase"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -648,6 +710,7 @@ export const PurchaseModule: React.FC<PurchaseModuleProps> = ({ onOpenPrintModal
                   <th className="p-3 text-right">Purchased Weight (Kg)</th>
                   <th className="p-3 text-right">Cost (₹)</th>
                   <th className="p-3 text-right">Inward User</th>
+                  <th className="p-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/10">
@@ -668,6 +731,22 @@ export const PurchaseModule: React.FC<PurchaseModuleProps> = ({ onOpenPrintModal
                       {formatCurrencyINR(core.cost)}
                     </td>
                     <td className="p-3 text-right text-black/50 text-[10px] font-mono">{core.createdBy}</td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() =>
+                          setPurchaseToDelete({
+                            type: 'paperCore',
+                            id: core.id,
+                            label: `Paper Core Purchase (${core.thickness})`,
+                            details: `Supplier: ${core.supplierName}, Weight: ${core.weight} Kg, Cost: ₹${core.cost}`,
+                          })
+                        }
+                        className="p-1.5 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-black/60 transition-colors"
+                        title="Delete Paper Core Purchase"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -688,6 +767,7 @@ export const PurchaseModule: React.FC<PurchaseModuleProps> = ({ onOpenPrintModal
                   <th className="p-3 text-right">Quantity (Nos / Boxes)</th>
                   <th className="p-3 text-right">Total Cost (₹)</th>
                   <th className="p-3 text-right">Inward User</th>
+                  <th className="p-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/10">
@@ -702,6 +782,22 @@ export const PurchaseModule: React.FC<PurchaseModuleProps> = ({ onOpenPrintModal
                       {formatCurrencyINR(box.cost)}
                     </td>
                     <td className="p-3 text-right text-black/50 text-[10px] font-mono">{box.createdBy}</td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() =>
+                          setPurchaseToDelete({
+                            type: 'cartonBox',
+                            id: box.id,
+                            label: `Carton Box Purchase (${box.boxCount} Boxes)`,
+                            details: `Supplier: ${box.supplierName}, Cost: ₹${box.cost}`,
+                          })
+                        }
+                        className="p-1.5 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-black/60 transition-colors"
+                        title="Delete Carton Box Purchase"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -722,6 +818,7 @@ export const PurchaseModule: React.FC<PurchaseModuleProps> = ({ onOpenPrintModal
                   <th className="p-3 text-right">Purchased Weight (Kg)</th>
                   <th className="p-3 text-right">Total Cost (₹)</th>
                   <th className="p-3 text-right">Inward User</th>
+                  <th className="p-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/10">
@@ -736,10 +833,68 @@ export const PurchaseModule: React.FC<PurchaseModuleProps> = ({ onOpenPrintModal
                       {formatCurrencyINR(film.cost)}
                     </td>
                     <td className="p-3 text-right text-black/50 text-[10px] font-mono">{film.createdBy}</td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() =>
+                          setPurchaseToDelete({
+                            type: 'heatShrinkFilm',
+                            id: film.id,
+                            label: `Heat Shrink Film Purchase (${film.weight} Kg)`,
+                            details: `Supplier: ${film.supplierName}, Cost: ₹${film.cost}`,
+                          })
+                        }
+                        className="p-1.5 border border-black/15 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 text-black/60 transition-colors"
+                        title="Delete Heat Shrink Film Purchase"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {purchaseToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white border border-black/20 w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3 border-b border-black/15 pb-3">
+              <div className="w-9 h-9 bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-serif text-lg font-bold text-black">
+                  Delete Purchase Entry
+                </h3>
+                <p className="text-xs text-black/60">This inward entry will be purged from stock and ledger.</p>
+              </div>
+            </div>
+
+            <div className="bg-[#F8F8F5] border border-black/10 p-3.5 space-y-1 text-xs">
+              <div className="font-bold text-black">{purchaseToDelete.label}</div>
+              <div className="text-black/70 font-mono text-[11px]">{purchaseToDelete.details}</div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setPurchaseToDelete(null)}
+                className="px-4 py-2 border border-black/20 bg-white hover:bg-[#F4F4F1] text-xs font-mono uppercase font-semibold text-black"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeletePurchase}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-mono uppercase font-semibold flex items-center gap-1.5 shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Purchase</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
