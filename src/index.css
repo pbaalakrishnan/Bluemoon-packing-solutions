@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --editorial-bg: #F4F4F1;
+    --editorial-card: #FFFFFF;
+    --editorial-card-muted: #F8F8F5;
+    --editorial-border: rgba(18, 18, 18, 0.12);
+    --editorial-border-dark: rgba(18, 18, 18, 0.25);
+    --editorial-text: #121212;
+    --editorial-muted: #666660;
+    --editorial-accent: #000000;
+  }
+
+  body {
+    background-color: #F4F4F1;
+    color: #121212;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  h1, h2, h3, .font-serif-title {
+    font-family: 'Newsreader', 'Georgia', serif;
+  }
+
+  .font-display {
+    font-family: 'Instrument Serif', 'Newsreader', serif;
+  }
+
+  .font-mono-data {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Custom Editorial Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F4F4F1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D5D5CF;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #A8A8A0;
+}
+
+/* Print optimizations */
+@media print {
+  body {
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+  }
+}

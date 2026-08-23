@@ -1,0 +1,6 @@
+{
+  "name": "Bluemoon Packing Solutions - Inventory, Production & Sales ERP",
+  "description": "Comprehensive industrial packing & tape manufacturing ERP system managing Purchase, Raw Materials, Production Jobs, Finished Goods, Sales, and Inventory Ledgers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
