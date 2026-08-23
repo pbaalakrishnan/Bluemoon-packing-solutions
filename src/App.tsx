@@ -87,7 +87,6 @@ const MainLayout: React.FC = () => {
       {/* Top Editorial Navbar */}
       <Navbar
         onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
-        onOpenTestRunner={() => setActiveTab('settings')}
         onOpenAlerts={() => setActiveTab('dashboard')}
         activeModule={activeTab}
       />

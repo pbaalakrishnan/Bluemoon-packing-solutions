@@ -15,14 +15,12 @@ import {
 
 interface NavbarProps {
   onToggleSidebar: () => void;
-  onOpenTestRunner?: () => void;
   onOpenAlerts?: () => void;
   activeModule?: string;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   onToggleSidebar,
-  onOpenTestRunner,
   onOpenAlerts,
   activeModule,
 }) => {
@@ -62,7 +60,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {COMPANY_INFO.name}
                 </span>
                 <span className="font-sans text-[10px] uppercase tracking-[0.2em] font-semibold text-black/50 hidden sm:inline">
-                  v2.04 // MANUFACTURING ERP
+                  ERP SUITE // PRODUCTION READY
                 </span>
               </div>
               <p className="hidden xl:block text-[11px] font-sans text-black/60 tracking-normal truncate max-w-xl">
@@ -74,18 +72,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right: Actions, Role Selector & User Profile */}
         <div className="flex items-center space-x-2 sm:space-x-3">
-          {/* Automated Test Suite Button */}
-          {onOpenTestRunner && (
-            <button
-              onClick={onOpenTestRunner}
-              className="flex items-center space-x-1.5 px-3 py-1.5 border border-black/15 bg-white hover:bg-black hover:text-white text-[#121212] text-xs font-sans uppercase tracking-wider font-semibold transition-all shadow-none"
-              title="Run Verification Tests"
-            >
-              <PlayCircle className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Verify Tests</span>
-            </button>
-          )}
-
           {/* Low Stock Alerts Icon */}
           {onOpenAlerts && (
             <button

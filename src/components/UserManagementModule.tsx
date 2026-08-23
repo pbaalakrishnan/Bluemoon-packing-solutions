@@ -156,9 +156,9 @@ export const UserManagementModule: React.FC = () => {
                       <button
                         onClick={() => switchUser(u.id)}
                         className="px-2.5 py-1 border border-black/20 bg-white hover:bg-black hover:text-white text-black text-[10px] font-mono uppercase tracking-wider transition-colors"
-                        title="Simulate Switch to this User"
+                        title="Switch active user session"
                       >
-                        Switch To
+                        Set Active
                       </button>
                       <button
                         onClick={() => handleToggleStatus(u.id, u.status)}
